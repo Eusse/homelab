@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pihole
+  namespace: default
+  labels:
+    app: pihole
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pihole
+  template:
+    metadata:
+      labels:
+        app: pihole
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: pihole
+          image: pihole/pihole:latest
+          securityContext:
+            runAsUser: 0
+          env:
+            - name: TZ
+              value: "America/New_York"
+            - name: FTLCONF_webserver_active
+              value: "true"
+            # Set webserver port to 8080 for HTTP and 8443 for HTTPS
+            - name: FTLCONF_webserver_port
+              value: "8080,8443s"
+            - name: FTLCONF_webserver_api_password
+              value: "admin"
+            - name: FTLCONF_webserver_domain
+              value: ""
+          volumeMounts:
+            - mountPath: /etc/pihole
+              name: pihole-config
+      volumes:
+        - name: pihole-config
+          hostPath:
+            path: /srv/pihole/data
+            type: DirectoryOrCreate

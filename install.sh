@@ -20,4 +20,11 @@ microk8s enable hostpath-storage
 sudo mkdir -p /srv/jellyfin/config
 sudo mkdir -p /srv/jellyfin/tvshows
 sudo mkdir -p /srv/jellyfin/movies
-
+# Ensure permissions allow the containers to write to the config path
+sudo chmod -R 777 /srv/jellyfin/config
+# Pi- Hole
+sudo mkdir -p /srv/pihole/config
+sudo chmod -R 777 /srv/pihole
+# Handle Port 53 Conflict on Host
+sudo sed -i 's/#DNSStubListener=yes/DNSStubListener=no/' /etc/systemd/resolved.conf
+sudo systemctl restart systemd-resolved
