@@ -28,3 +28,11 @@ sudo chmod -R 777 /srv/pihole
 # Handle Port 53 Conflict on Host
 sudo sed -i 's/#DNSStubListener=yes/DNSStubListener=no/' /etc/systemd/resolved.conf
 sudo systemctl restart systemd-resolved
+# Immich
+sudo mkdir -p /srv/immich/upload
+sudo mkdir -p /srv/immich/postgres
+sudo chmod -R 777 /srv/immich
+# Install helm
+sudo snap install helm --classic
+# install sonarr
+helm install seerr oci://ghcr.io/seerr-team/seerr/seerr-chart
