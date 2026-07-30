@@ -35,4 +35,8 @@ sudo chmod -R 777 /srv/immich
 # Install helm
 sudo snap install helm --classic
 # install sonarr
-helm install seerr oci://ghcr.io/seerr-team/seerr/seerr-chart
+sudo mkdir -p /srv/media/tv
+sudo mkdir -p /srv/media/downloads
+sudo chmod -R 777 /srv/media
+
+#helm install seerr oci://ghcr.io/seerr-team/seerr/seerr-chart
