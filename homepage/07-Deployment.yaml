@@ -42,7 +42,7 @@ spec:
                 fieldRef:
                   fieldPath: status.podIP
             - name: HOMEPAGE_ALLOWED_HOSTS
-              value: "$(MY_POD_IP):3000,gethomepage.dev" # See gethomepage.dev/installation/#homepage_allowed_hosts . Value before the comma is required for the k8s probe
+              value: "$(MY_POD_IP):3000,gethomepage.dev,192.168.78.166:30000,pulguitos.network"
           ports:
             - name: http
               containerPort: 3000
@@ -66,6 +66,9 @@ spec:
             - mountPath: /app/config/docker.yaml
               name: homepage-config
               subPath: docker.yaml
+            - mountPath: /app/config/proxmox.yaml
+              name: homepage-config
+              subPath: proxmox.yaml
             - mountPath: /app/config/kubernetes.yaml
               name: homepage-config
               subPath: kubernetes.yaml

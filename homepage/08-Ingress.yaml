@@ -6,17 +6,19 @@ metadata:
   labels:
     app.kubernetes.io/name: homepage
   annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
     gethomepage.dev/description: Dynamically Detected Homepage
     gethomepage.dev/enabled: "true"
     gethomepage.dev/group: Cluster Management
     gethomepage.dev/icon: homepage.png
     gethomepage.dev/name: Homepage
 spec:
+  ingressClassName: public
   rules:
-    - host: "homepage.my.network"
+    - host: pulguitos.network
       http:
         paths:
-          - path: "/"
+          - path: /
             pathType: Prefix
             backend:
               service:
