@@ -28,7 +28,7 @@ sudo sed -i 's/#DNSStubListener=yes/DNSStubListener=no/' /etc/systemd/resolved.c
 sudo systemctl restart systemd-resolved || true
 
 # Shared Media Directories
-sudo mkdir -p /srv/media/tv /srv/media/downloads
+sudo mkdir -p /srv/media/tv /srv/media/downloads /srv/media/movies
 sudo chmod -R 777 /srv/media
 
 # Service Storage Directories
