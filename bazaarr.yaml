@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bazarr
+  labels:
+    app: bazarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bazarr
+  template:
+    metadata:
+      labels:
+        app: bazarr
+    spec:
+      containers:
+        - name: bazarr
+          image: lscr.io/linuxserver/bazarr:latest
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: "America/Bogota"
+          ports:
+            - containerPort: 6767
+              name: http
+          volumeMounts:
+            - mountPath: /config
+              name: bazarr-config
+            - mountPath: /srv/media/tv
+              name: media-tvshows
+      volumes:
+        - name: bazarr-config
+          hostPath:
+            path: /srv/bazarr/config
+            type: DirectoryOrCreate
+        - name: media-tvshows
+          hostPath:
+            path: /srv/media/tv
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bazarr-service
+spec:
+  type: NodePort
+  selector:
+    app: bazarr
+  ports:
+    - port: 6767
+      targetPort: 6767
+      nodePort: 30767
