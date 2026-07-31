@@ -47,16 +47,24 @@ data:
             description: Media Server
             widget:
               type: jellyfin
-              url: http://jellyfin.default.svc.cluster.local:8096
-              key: YOUR_JELLYFIN_API_KEY
+              url: http://jellyfin-service.default.svc.cluster.local:8096
+              key: API_KEY
         - Immich:
             icon: immich.png
             href: http://immich.local/  # Update with your domain/IP
             description: Photo & Video Backup
             widget:
               type: immich
-              url: http://immich.default.svc.cluster.local:2283
-              key: YOUR_IMMICH_API_KEY
+              url: http://immich-service.default.svc.cluster.local:2283
+              key: API_KEY
+        - Jellyseerr:
+            icon: jellyseerr.png
+            href: http://jellyseerr.local/
+            description: Media Request Management
+            widget:
+              type: jellyseerr
+              url: http://jellyseerr.default.svc.cluster.local:5055
+              key: API_KEY
 
     - Automation & Downloads:
         - Sonarr:
@@ -66,15 +74,15 @@ data:
             widget:
               type: sonarr
               url: http://sonarr.default.svc.cluster.local:8989
-              key: YOUR_SONARR_API_KEY
+              key: API_KEY
         - Bazarr:
             icon: bazarr.png
             href: http://bazarr.local/  # Update with your domain/IP
             description: Subtitle Manager
             widget:
               type: bazarr
-              url: http://bazarr.default.svc.cluster.local:6767
-              key: YOUR_BAZARR_API_KEY
+              url: http://bazarr-service.default.svc.cluster.local:6767
+              key: API_KEY
         - Prowlarr:
             icon: prowlarr.png
             href: http://prowlarr.local/  # Update with your domain/IP
@@ -82,26 +90,26 @@ data:
             widget:
               type: prowlarr
               url: http://prowlarr.default.svc.cluster.local:9696
-              key: YOUR_PROWLARR_API_KEY
+              key: API_KEY
         - qBittorrent:
             icon: qbittorrent.png
             href: http://qbittorrent.local/  # Update with your domain/IP
             description: Torrent Client
             widget:
               type: qbittorrent
-              url: http://qbittorrent.default.svc.cluster.local:8080
+              url: http://qbittorrent.default.svc.cluster.local:30081
               username: admin
-              password: YOUR_QBITTORRENT_PASSWORD
+              password: PASSWORD
 
     - Network & Infrastructure:
         - Pi-hole:
-            icon: pihole.png
-            href: http://pihole.local/  # Update with your domain/IP
+            icon: pi-hole.png
+            href: http://pihole-web.default.svc.cluster.local:30080/admin/ 
             description: Network-wide Ad Blocking
             widget:
               type: pihole
-              url: http://pihole.default.svc.cluster.local:80
-              key: YOUR_PIHOLE_API_KEY
+              url: http://pihole-web.default.svc.cluster.local:30080
+              key: API_KEY
   widgets.yaml: |
     - kubernetes:
         cluster:
