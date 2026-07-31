@@ -34,11 +34,11 @@ spec:
             type: Directory
         - name: media-tvshows
           hostPath:
-            path: /srv/jellyfin/tvshows
+            path: /srv/media/tv
             type: Directory
         - name: media-movies
           hostPath:
-            path: /srv/jellyfin/movies
+            path: /srv/media/movies
             type: Directory
 ---
 apiVersion: v1
