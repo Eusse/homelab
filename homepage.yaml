@@ -43,73 +43,74 @@ data:
     - Media & Streaming:
         - Jellyfin:
             icon: jellyfin.png
-            href: http://jellyfin.local/  # Update with your domain/IP
+            href: http://homelab.local:32096/
             description: Media Server
             widget:
               type: jellyfin
               url: http://jellyfin-service.default.svc.cluster.local:8096
-              key: API_KEY
+              key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
         - Immich:
             icon: immich.png
-            href: http://immich.local/  # Update with your domain/IP
+            href: http://homelab.local:32283/
             description: Photo & Video Backup
             widget:
               type: immich
               url: http://immich-service.default.svc.cluster.local:2283
-              key: API_KEY
+              key: "{{HOMEPAGE_VAR_IMMICH_API_KEY}}"
+              version: 2
         - Jellyseerr:
             icon: jellyseerr.png
-            href: http://jellyseerr.local/
+            href: http://homelab.local:30055/
             description: Media Request Management
-            widget:
-              type: jellyseerr
-              url: http://jellyseerr.default.svc.cluster.local:5055
-              key: API_KEY
 
     - Automation & Downloads:
         - Sonarr:
             icon: sonarr.png
-            href: http://sonarr.local/  # Update with your domain/IP
+            href: http://homelab.local:30089/
             description: TV Series Management
             widget:
               type: sonarr
               url: http://sonarr.default.svc.cluster.local:8989
-              key: API_KEY
+              key: "{{HOMEPAGE_VAR_SONARR_API_KEY}}"
         - Bazarr:
             icon: bazarr.png
-            href: http://bazarr.local/  # Update with your domain/IP
+            href: http://homelab.local:30767/
             description: Subtitle Manager
             widget:
               type: bazarr
               url: http://bazarr-service.default.svc.cluster.local:6767
-              key: API_KEY
+              key: "{{HOMEPAGE_VAR_BAZARR_API_KEY}}"
         - Prowlarr:
             icon: prowlarr.png
-            href: http://prowlarr.local/  # Update with your domain/IP
+            href: http://homelab.local:30096/
             description: Indexer Manager
             widget:
               type: prowlarr
               url: http://prowlarr.default.svc.cluster.local:9696
-              key: API_KEY
+              key: "{{HOMEPAGE_VAR_PROWLARR_API_KEY}}"
         - qBittorrent:
             icon: qbittorrent.png
-            href: http://qbittorrent.local/  # Update with your domain/IP
+            href: http://homelab.local:30081/
             description: Torrent Client
             widget:
               type: qbittorrent
               url: http://qbittorrent.default.svc.cluster.local:30081
-              username: admin
-              password: PASSWORD
+              username: "{{HOMEPAGE_VAR_QBITTORRENT_USER}}"
+              password: "{{HOMEPAGE_VAR_QBITTORRENT_PASS}}"
 
-    - Network & Infrastructure:
+    - Management & Infrastructure:
+        - Infisical:
+            icon: infisical.png
+            href: http://homelab.local:8080/
+            description: Secret & Identity Management
         - Pi-hole:
             icon: pi-hole.png
-            href: http://pihole-web.default.svc.cluster.local:30080/admin/ 
+            href: http://homelab.local:30080/admin/
             description: Network-wide Ad Blocking
             widget:
               type: pihole
               url: http://pihole-web.default.svc.cluster.local:30080
-              key: API_KEY
+              key: "{{HOMEPAGE_VAR_PIHOLE_API_KEY}}"
   widgets.yaml: |
     - kubernetes:
         cluster:
@@ -252,6 +253,9 @@ spec:
             runAsGroup: 1000
             seccompProfile:
               type: RuntimeDefault
+          envFrom:
+            - secretRef:
+                name: homepage-api-keys
           env:
             - name: MY_POD_IP
               valueFrom:

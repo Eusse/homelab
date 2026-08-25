@@ -83,5 +83,12 @@ if [ -f "qbittorrent.yaml" ]; then
   fi
 fi
 
+# Install Infisical operator
+microk8s helm repo add infisical-helm-charts 'https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/'
+microk8s helm repo update
+microk8s helm install infisical-operator infisical-helm-charts/secrets-operator
+
+
+
 echo "=== Setup Complete ==="
 echo "All manifests applied successfully!"

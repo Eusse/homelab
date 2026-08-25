@@ -1,0 +1,15 @@
+apiVersion: secrets.infisical.com/v1alpha1
+kind: InfisicalSecret
+metadata:
+  name: homepage-infisical-sync
+  namespace: default
+spec:
+  hostAPI: http://infisical-standalone-postgres.default.svc.cluster.local:8080
+  resyncInterval: 60
+  authentication:
+    universalAuth:
+      secretsRef:
+        secretName: infisical-credentials
+  managedSecretRef:
+    secretName: homepage-api-keys
+    creationPolicy: Owner
