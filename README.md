@@ -61,15 +61,33 @@ qbittorrent:
     password: "<pick a real password>"
 
 secretSync:
+  # This account must already exist in Jellyfin - see the note below.
   jellyfin:
     adminUser: "<jellyfin admin username, once created>"
     adminPassword: "<jellyfin admin password>"
-  pihole:
-    webPasswordHash: ""
 
 pihole:
   webPassword: "<pick a real password>"
 ```
+
+Two of these apps need a **one-time manual step in their own UI** before
+`secret-sync` can mint an API key for them — neither is something a Helm
+chart can automate away, since both require interacting with a first-run
+setup flow in a browser:
+
+- **Jellyfin** requires completing its first-run setup wizard (create the
+  admin account) before *any* account exists to authenticate as. Open
+  `http://<node-ip>:32096/` (or its LAN hostname), go through the wizard,
+  and create the admin user with the exact username/password you put in
+  `secretSync.jellyfin`. Until this is done, `JELLYFIN_API_KEY` simply
+  won't appear in Homepage's secret - check `kubectl -n homelab logs
+  job/secret-sync` for `[Jellyfin Key Gen Error]` if you're unsure.
+- **Immich** needs `immich.adminApiKey` filled in from a key you generate
+  yourself after first login (Settings → API Keys), as noted above.
+
+After completing either step, re-run `helm upgrade` to re-trigger
+`secret-sync` (it's idempotent - re-pushing already-synced keys is
+harmless).
 
 If you're curious afterwards, the generated credentials are readable (once)
 via:

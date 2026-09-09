@@ -111,7 +111,7 @@ data:
         secrets_manifest["QBITTORRENT_PASS"] = os.environ.get("QBIT_PASS", "")
 
     if env_true("SYNC_PIHOLE"):
-        secrets_manifest["PIHOLE_API_KEY"] = os.environ.get("PIHOLE_WEBPASSWORD_HASH")
+        secrets_manifest["PIHOLE_API_KEY"] = os.environ.get("PIHOLE_ADMIN_PASSWORD")
 
     if env_true("SYNC_JELLYFIN"):
         try:
