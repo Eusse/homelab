@@ -7,7 +7,10 @@ metadata:
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "20"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    # No hook-succeeded: the secret-sync Job mounts this as a volume at pod
+    # start - hook-succeeded would delete it as soon as it's created,
+    # racing ahead of that pod actually starting.
+    helm.sh/hook-delete-policy: before-hook-creation
 data:
   sync_and_wire.py: |
     import os

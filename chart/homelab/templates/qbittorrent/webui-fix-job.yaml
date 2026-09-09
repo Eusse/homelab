@@ -7,7 +7,12 @@ metadata:
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "4"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    # No hook-succeeded here: this resource is deleted the instant Helm
+    # considers it "succeeded" (i.e. right after creation), which races
+    # ahead of the Job pod below actually starting and mounting its
+    # ServiceAccount token - before-hook-creation alone still replaces it
+    # cleanly on the next install/upgrade.
+    helm.sh/hook-delete-policy: before-hook-creation
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -17,7 +22,12 @@ metadata:
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "4"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    # No hook-succeeded here: this resource is deleted the instant Helm
+    # considers it "succeeded" (i.e. right after creation), which races
+    # ahead of the Job pod below actually starting and mounting its
+    # ServiceAccount token - before-hook-creation alone still replaces it
+    # cleanly on the next install/upgrade.
+    helm.sh/hook-delete-policy: before-hook-creation
 rules:
   - apiGroups: ["apps"]
     resources: ["deployments", "deployments/scale"]
@@ -32,7 +42,12 @@ metadata:
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "4"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    # No hook-succeeded here: this resource is deleted the instant Helm
+    # considers it "succeeded" (i.e. right after creation), which races
+    # ahead of the Job pod below actually starting and mounting its
+    # ServiceAccount token - before-hook-creation alone still replaces it
+    # cleanly on the next install/upgrade.
+    helm.sh/hook-delete-policy: before-hook-creation
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
