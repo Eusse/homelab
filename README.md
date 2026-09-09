@@ -83,6 +83,48 @@ See `helm install`'s NOTES output for the URLs of everything that got
 enabled. Give it a minute after first install — Homepage's widgets only
 populate once the Infisical Operator's first resync completes.
 
+## LAN hostnames
+
+By default (`global.lanIngress.enabled: true`) every app also gets an
+`Ingress` at `<app>.homelab` (e.g. `immich.homelab`, `sonarr.homelab`) —
+see the base domain at `global.lanIngress.baseDomain`. This is on top of,
+not instead of, the NodePort URLs; both work.
+
+That hostname only resolves for a browser once **something on your LAN
+answers DNS for it and points it at the node's IP**
+(`global.nodeIP`) — the same distinction as `ssh homelab` only working
+because it's in your `~/.ssh/config`, not because any name server
+knows about it. The chart does not configure this for you. Two ways to
+set it up, using the Pi-hole this stack already installs:
+
+1. **Wildcard (recommended, one-time setup):** Pi-hole → Settings → DNS →
+   the box under "Custom DNS records", or by mounting a
+   `/etc/dnsmasq.d/*.conf` file into the pihole container with:
+   ```
+   address=/homelab/192.168.78.166
+   ```
+   This resolves `*.homelab` (any app, present or future) to the node.
+   Confirm your Pi-hole version still honors dnsmasq-style config drop-ins
+   before relying on it — check Settings → DNS in its admin UI.
+2. **Per-app records:** Pi-hole admin UI → Local DNS Records → add
+   `immich.homelab` → `192.168.78.166`, one entry per app. More manual,
+   but guaranteed to work regardless of Pi-hole version.
+
+Either way, **your LAN clients need to actually use Pi-hole as their DNS
+server** for this to work without per-device config — set your router's
+DHCP "DNS server" option to the node's IP, or point each device's network
+settings at it manually. If you don't want to do that, add the same
+`<app>.homelab` → node IP mapping to each client's `/etc/hosts` (or
+Windows' `C:\Windows\System32\drivers\etc\hosts`) instead — same effect,
+just per-device rather than LAN-wide.
+
+If neither DNS piece is set up yet, disable this and stick to NodePort URLs:
+
+```bash
+helm upgrade homelab ./chart/homelab -n homelab -f secrets.values.yaml \
+  --set global.lanIngress.enabled=false
+```
+
 ## Toggling apps
 
 Every app has an `<app>.enabled` flag in

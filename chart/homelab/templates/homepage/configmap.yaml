@@ -107,7 +107,7 @@ data:
             description: Network-wide Ad Blocking
             widget:
               type: pihole
-              url: http://{{ .Values.global.nodeIP }}:{{ .Values.pihole.webPort }}
+              url: http://pihole-web.{{ $ns }}.svc.cluster.local:{{ .Values.pihole.webPort }}
               key: "{{ "{{HOMEPAGE_VAR_PIHOLE_API_KEY}}" }}"
         {{- end }}
   widgets.yaml: |

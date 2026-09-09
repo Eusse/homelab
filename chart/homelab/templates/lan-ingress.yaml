@@ -1,0 +1,41 @@
+{{- if .Values.global.lanIngress.enabled }}
+{{- $ns := .Release.Namespace }}
+{{- $ic := .Values.global.ingressClassName }}
+{{- $base := .Values.global.lanIngress.baseDomain }}
+{{- if .Values.homepage.enabled }}
+---
+{{ include "homelab.lanIngressRule" (dict "name" "homepage" "namespace" $ns "ingressClassName" $ic "host" (printf "homepage.%s" $base) "serviceName" "homepage" "servicePort" 3000) }}
+{{- end }}
+{{- if .Values.jellyfin.enabled }}
+---
+{{ include "homelab.lanIngressRule" (dict "name" "jellyfin" "namespace" $ns "ingressClassName" $ic "host" (printf "jellyfin.%s" $base) "serviceName" "jellyfin-service" "servicePort" 8096) }}
+{{- end }}
+{{- if .Values.sonarr.enabled }}
+---
+{{ include "homelab.lanIngressRule" (dict "name" "sonarr" "namespace" $ns "ingressClassName" $ic "host" (printf "sonarr.%s" $base) "serviceName" "sonarr" "servicePort" 8989) }}
+{{- end }}
+{{- if .Values.prowlarr.enabled }}
+---
+{{ include "homelab.lanIngressRule" (dict "name" "prowlarr" "namespace" $ns "ingressClassName" $ic "host" (printf "prowlarr.%s" $base) "serviceName" "prowlarr" "servicePort" 9696) }}
+{{- end }}
+{{- if .Values.bazarr.enabled }}
+---
+{{ include "homelab.lanIngressRule" (dict "name" "bazarr" "namespace" $ns "ingressClassName" $ic "host" (printf "bazarr.%s" $base) "serviceName" "bazarr-service" "servicePort" 6767) }}
+{{- end }}
+{{- if .Values.qbittorrent.enabled }}
+---
+{{ include "homelab.lanIngressRule" (dict "name" "qbittorrent" "namespace" $ns "ingressClassName" $ic "host" (printf "qbittorrent.%s" $base) "serviceName" "qbittorrent" "servicePort" (.Values.qbittorrent.service.webuiNodePort | int)) }}
+{{- end }}
+{{- if .Values.immich.enabled }}
+---
+{{ include "homelab.lanIngressRule" (dict "name" "immich" "namespace" $ns "ingressClassName" $ic "host" (printf "immich.%s" $base) "serviceName" "immich-service" "servicePort" 2283) }}
+{{- end }}
+{{- if .Values.jellyseerr.enabled }}
+---
+{{ include "homelab.lanIngressRule" (dict "name" "jellyseerr" "namespace" $ns "ingressClassName" $ic "host" (printf "jellyseerr.%s" $base) "serviceName" "jellyseerr" "servicePort" 5055) }}
+{{- end }}
+{{- if .Values.pihole.enabled }}
+---
+{{ include "homelab.lanIngressRule" (dict "name" "pihole" "namespace" $ns "ingressClassName" $ic "host" (printf "pihole.%s" $base) "serviceName" "pihole-web" "servicePort" (.Values.pihole.webPort | int)) }}
+{{- end }}
+{{- end }}

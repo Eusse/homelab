@@ -15,6 +15,13 @@ global:
   nodeIP: 192.168.78.166
   timezone: America/Bogota
   ingressClassName: public
+  # When enabled, every app also gets an Ingress at <app>.<baseDomain>
+  # (e.g. immich.homelab) instead of only being reachable via NodePort.
+  # This only works once something resolves "*.<baseDomain>" to nodeIP for
+  # your LAN clients - see README.md's "LAN hostnames" section.
+  lanIngress:
+    enabled: true
+    baseDomain: homelab
 
 # --- Infisical Kubernetes Operator (installed as a chart dependency) ---
 infisicalOperator:

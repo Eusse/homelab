@@ -1,0 +1,19 @@
+{{- if .Values.pihole.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: pihole-web
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "homelab.labels" (dict "name" "pihole" "Release" .Release) | nindent 4 }}
+spec:
+  # pihole runs with hostNetwork: true, so this Service just forwards to the
+  # pod's (=node's) IP - it exists so other in-cluster things (Ingress,
+  # Homepage's widget) can reach it by a stable DNS name instead of nodeIP.
+  selector:
+    app: pihole
+  ports:
+    - name: http
+      port: {{ .Values.pihole.webPort }}
+      targetPort: {{ .Values.pihole.webPort }}
+{{- end }}

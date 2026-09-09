@@ -18,3 +18,33 @@ Name of the Secret holding Infisical universal-auth credentials.
 infisical-credentials
 {{- end -}}
 {{- end -}}
+
+{{/*
+A single LAN-facing Ingress rule: <app>.<baseDomain> -> service:port.
+Usage: {{ include "homelab.lanIngressRule" (dict "name" "jellyfin" "namespace" $ns
+          "ingressClassName" $ic "host" "jellyfin.homelab" "serviceName" "jellyfin-service"
+          "servicePort" 8096) }}
+*/}}
+{{- define "homelab.lanIngressRule" -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .name }}-lan
+  namespace: {{ .namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .name }}
+    app.kubernetes.io/part-of: homelab
+spec:
+  ingressClassName: {{ .ingressClassName }}
+  rules:
+    - host: {{ .host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .serviceName }}
+                port:
+                  number: {{ .servicePort }}
+{{- end -}}

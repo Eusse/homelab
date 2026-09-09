@@ -1,32 +1,43 @@
 Homelab stack deployed into namespace "{{ .Release.Namespace }}".
+{{- $lan := .Values.global.lanIngress.enabled }}
+{{- $base := .Values.global.lanIngress.baseDomain }}
 
 Enabled apps:
 {{- if .Values.jellyfin.enabled }}
-  - Jellyfin:      http://{{ .Values.global.lanHost }}:{{ .Values.jellyfin.service.nodePort }}/
+  - Jellyfin:      http://{{ .Values.global.lanHost }}:{{ .Values.jellyfin.service.nodePort }}/{{ if $lan }}  (or http://jellyfin.{{ $base }}/){{ end }}
 {{- end }}
 {{- if .Values.immich.enabled }}
-  - Immich:        http://{{ .Values.global.lanHost }}:{{ .Values.immich.service.nodePort }}/
+  - Immich:        http://{{ .Values.global.lanHost }}:{{ .Values.immich.service.nodePort }}/{{ if $lan }}  (or http://immich.{{ $base }}/){{ end }}
 {{- end }}
 {{- if .Values.jellyseerr.enabled }}
-  - Jellyseerr:    http://{{ .Values.global.lanHost }}:{{ .Values.jellyseerr.service.nodePort }}/
+  - Jellyseerr:    http://{{ .Values.global.lanHost }}:{{ .Values.jellyseerr.service.nodePort }}/{{ if $lan }}  (or http://jellyseerr.{{ $base }}/){{ end }}
 {{- end }}
 {{- if .Values.sonarr.enabled }}
-  - Sonarr:        http://{{ .Values.global.lanHost }}:{{ .Values.sonarr.service.nodePort }}/
+  - Sonarr:        http://{{ .Values.global.lanHost }}:{{ .Values.sonarr.service.nodePort }}/{{ if $lan }}  (or http://sonarr.{{ $base }}/){{ end }}
 {{- end }}
 {{- if .Values.prowlarr.enabled }}
-  - Prowlarr:      http://{{ .Values.global.lanHost }}:{{ .Values.prowlarr.service.nodePort }}/
+  - Prowlarr:      http://{{ .Values.global.lanHost }}:{{ .Values.prowlarr.service.nodePort }}/{{ if $lan }}  (or http://prowlarr.{{ $base }}/){{ end }}
 {{- end }}
 {{- if .Values.bazarr.enabled }}
-  - Bazarr:        http://{{ .Values.global.lanHost }}:{{ .Values.bazarr.service.nodePort }}/
+  - Bazarr:        http://{{ .Values.global.lanHost }}:{{ .Values.bazarr.service.nodePort }}/{{ if $lan }}  (or http://bazarr.{{ $base }}/){{ end }}
 {{- end }}
 {{- if .Values.qbittorrent.enabled }}
-  - qBittorrent:   http://{{ .Values.global.lanHost }}:{{ .Values.qbittorrent.service.webuiNodePort }}/
+  - qBittorrent:   http://{{ .Values.global.lanHost }}:{{ .Values.qbittorrent.service.webuiNodePort }}/{{ if $lan }}  (or http://qbittorrent.{{ $base }}/){{ end }}
 {{- end }}
 {{- if .Values.pihole.enabled }}
-  - Pi-hole:       http://{{ .Values.global.lanHost }}:{{ .Values.pihole.webPort }}/admin/
+  - Pi-hole:       http://{{ .Values.global.lanHost }}:{{ .Values.pihole.webPort }}/admin/{{ if $lan }}  (or http://pihole.{{ $base }}/admin/){{ end }}
 {{- end }}
 {{- if .Values.homepage.enabled }}
-  - Homepage:      http://{{ .Values.global.lanHost }}:{{ .Values.homepage.service.nodePort }}/{{ if .Values.homepage.ingress.enabled }} (also https://{{ .Values.global.domain }}/){{ end }}
+  - Homepage:      http://{{ .Values.global.lanHost }}:{{ .Values.homepage.service.nodePort }}/{{ if $lan }} (or http://homepage.{{ $base }}/){{ end }}{{ if .Values.homepage.ingress.enabled }} (also https://{{ .Values.global.domain }}/){{ end }}
+{{- end }}
+
+{{- if $lan }}
+
+The "*.{{ $base }}" links above only resolve once something on your LAN
+answers DNS for them and points at the node ({{ .Values.global.nodeIP }}).
+This chart does NOT configure that DNS record automatically - see
+README.md's "LAN hostnames" section for how to add it in Pi-hole (or your
+router), or use the NodePort link on the left instead.
 {{- end }}
 
 A post-install Job ("secret-sync") just pulled/generated each enabled app's API
