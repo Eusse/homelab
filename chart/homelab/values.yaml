@@ -44,20 +44,12 @@ infisical-server:
     fullnameOverride: "infisical-server"
     replicaCount: 1
     autoBootstrap:
-      enabled: true
-      organization: "homelab"
-      secretDestination:
-        name: infisical-bootstrap-secret
-        # Empty on purpose: the subchart falls back to the release namespace
-        # only when this is empty - its own default value is the literal
-        # string "default", which would silently write the secret there.
-        namespace: ""
-      # Adds organizationId alongside the default token, so the provisioning
-      # job below doesn't need a separate API call to look it up.
-      secretTemplate: |
-        {"data":{"token":"{{ .Identity.Credentials.Token }}","organizationId":"{{ .Organization.ID }}"}}
-      credentialSecret:
-        name: infisical-bootstrap-credentials
+      # Disabled: that job only runs on `helm install`, never `helm upgrade`
+      # (it's hardcoded to the post-install hook), so it can't be the sole
+      # bootstrap path for a chart that expects to be upgraded in place.
+      # The infisical-provision Job (post-install AND post-upgrade) calls
+      # Infisical's admin-bootstrap API itself instead - see its ConfigMap.
+      enabled: false
   ingress:
     enabled: false
     nginx:
