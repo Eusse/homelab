@@ -33,6 +33,11 @@ rules:
     resources: ["deployments", "deployments/scale"]
     resourceNames: ["qbittorrent"]
     verbs: ["get", "patch", "update"]
+  # `kubectl wait --for=delete pod -l ...` needs this - RBAC can't scope pod
+  # access by label selector, only by name, so this is namespace-wide.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

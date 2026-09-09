@@ -133,8 +133,17 @@ either way.
 helm dependency update ./chart/homelab
 helm install homelab ./chart/homelab \
   -n homelab --create-namespace \
-  -f secrets.values.yaml
+  -f secrets.values.yaml \
+  --timeout 15m
 ```
+
+`--timeout` bounds the *entire* install, hooks included - one shared clock
+for every image pull and every hook job in the chain (qBittorrent's WebUI
+fix, then Infisical's bootstrap chain, then `secret-sync`). Helm's default
+is 5 minutes, which is often too tight for a single-node box pulling this
+many images the first time; if you see `context deadline exceeded` on a
+hook Job that otherwise looks healthy in `kubectl describe pod`, that's
+this timeout, not a real failure - just re-run with a longer `--timeout`.
 
 This installs, in order:
 1. The Infisical Kubernetes Operator and (if `infisicalServer.enabled`) a
@@ -212,13 +221,16 @@ helm upgrade homelab ./chart/homelab -n homelab -f secrets.values.yaml \
 
 ## Upgrading / re-syncing secrets
 
-`helm upgrade` re-runs the secret-sync job and the qBittorrent WebUI fix job
-(both are `post-install,post-upgrade` hooks), so re-running keys or
-credential rotation just means:
+`helm upgrade` re-runs every post-install/post-upgrade hook (qBittorrent's
+WebUI fix, the Infisical bootstrap chain, `secret-sync`), so re-running keys
+or credential rotation just means:
 
 ```bash
-helm upgrade homelab ./chart/homelab -n homelab -f secrets.values.yaml
+helm upgrade homelab ./chart/homelab -n homelab -f secrets.values.yaml --timeout 15m
 ```
+
+(`--timeout` matters on every upgrade, not just the first install - see the
+note in step 3.)
 
 ## Troubleshooting
 
