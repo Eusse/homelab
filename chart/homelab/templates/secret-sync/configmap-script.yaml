@@ -71,6 +71,7 @@ data:
             if os.path.exists(path):
                 return True
             time.sleep(delay)
+        print(f"[warn] {path} did not appear within {attempts * delay}s")
         return False
 
     def get_xml_key(path):
@@ -104,7 +105,11 @@ data:
         secrets_manifest["PROWLARR_API_KEY"] = get_xml_key("/pvc-mounts/prowlarr/config.xml")
 
     if env_true("SYNC_BAZARR"):
-        secrets_manifest["BAZARR_API_KEY"] = get_bazarr_key("/pvc-mounts/bazarr/config.yaml")
+        # Bazarr nests its config under a `config/` subdirectory of its data
+        # dir (confirmed in its own source: config_base_file_path defaults
+        # to os.path.join(args.config_dir, 'config')), unlike Sonarr/Prowlarr
+        # which write config.xml directly at the root of /config.
+        secrets_manifest["BAZARR_API_KEY"] = get_bazarr_key("/pvc-mounts/bazarr/config/config.yaml")
 
     if env_true("SYNC_QBITTORRENT"):
         secrets_manifest["QBITTORRENT_USER"] = os.environ.get("QBIT_USER", "admin")
@@ -126,14 +131,21 @@ data:
                     "X-Emby-Authorization": 'MediaBrowser Client="SyncScript", Device="K8s", DeviceId="1", Version="1.0"'
                 },
                 timeout=15,
-            ).json()
-            token = auth_resp["AccessToken"]
-            key_resp = requests.post(
-                f"{jellyfin_url}/Auth/Keys?app=Homepage",
-                headers={"X-Emby-Token": token},
-                timeout=15,
-            ).json()
-            secrets_manifest["JELLYFIN_API_KEY"] = key_resp.get("AccessToken")
+            )
+            if not auth_resp.ok:
+                print(
+                    f"[Jellyfin Key Gen Error]: login failed with {auth_resp.status_code} "
+                    f"{auth_resp.text!r} - has the admin account in JELLYFIN_ADMIN_USER/PASS "
+                    "actually been created via Jellyfin's first-run setup wizard yet?"
+                )
+            else:
+                token = auth_resp.json()["AccessToken"]
+                key_resp = requests.post(
+                    f"{jellyfin_url}/Auth/Keys?app=Homepage",
+                    headers={"X-Emby-Token": token},
+                    timeout=15,
+                ).json()
+                secrets_manifest["JELLYFIN_API_KEY"] = key_resp.get("AccessToken")
         except Exception as e:
             print(f"[Jellyfin Key Gen Error]: {e}")
 
