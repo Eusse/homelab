@@ -1,4 +1,53 @@
 {{- if .Values.secretSync.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: secret-sync
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "24"
+    # No hook-succeeded: see the note on qbittorrent-webui-fix's ServiceAccount
+    # - it would delete this before the Job pod below can mount its token.
+    helm.sh/hook-delete-policy: before-hook-creation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: secret-sync
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "24"
+    helm.sh/hook-delete-policy: before-hook-creation
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["homepage-api-keys"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["homepage"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secret-sync
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "24"
+    helm.sh/hook-delete-policy: before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: secret-sync
+subjects:
+  - kind: ServiceAccount
+    name: secret-sync
+    namespace: {{ .Release.Namespace }}
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -12,6 +61,7 @@ spec:
   backoffLimit: 2
   template:
     spec:
+      serviceAccountName: secret-sync
       restartPolicy: Never
       containers:
         - name: secret-sync
@@ -23,6 +73,10 @@ spec:
               pip install --quiet --no-cache-dir requests pyyaml && \
               python /scripts/sync_and_wire.py
           env:
+            - name: NS
+              value: {{ .Release.Namespace | quote }}
+            - name: RESTART_HOMEPAGE
+              value: {{ .Values.homepage.enabled | quote }}
             - name: INFISICAL_HOST_API
               value: {{ .Values.infisical.hostAPI | quote }}
             - name: INFISICAL_PROJECT_ID

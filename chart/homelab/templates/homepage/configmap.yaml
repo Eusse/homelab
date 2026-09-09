@@ -98,7 +98,11 @@ data:
     - Management & Infrastructure:
         - Infisical:
             icon: infisical.png
-            href: http://{{ $lanHost }}:8080/
+            {{- if and .Values.infisicalServer.enabled .Values.global.lanIngress.enabled }}
+            href: http://infisical.{{ .Values.global.lanIngress.baseDomain }}/
+            {{- else }}
+            href: {{ .Values.infisical.hostAPI | trimSuffix "/api" }}/
+            {{- end }}
             description: Secret & Identity Management
         {{- if .Values.pihole.enabled }}
         - Pi-hole:

@@ -151,8 +151,82 @@ data:
             print(f"[Immich Key Gen Error]: {e}")
 
     token = get_access_token()
-    for k, v in secrets_manifest.items():
+    pushed = {k: v for k, v in secrets_manifest.items() if v}
+    for k, v in pushed.items():
         upsert_secret(token, k, v)
 
     print("Secret sync complete.")
+
+    # Homepage reads its API keys once, from envFrom, at container start -
+    # which always happens before this job runs (let alone before the
+    # Infisical Operator's own async resync picks up what was just pushed
+    # above). So every install/upgrade needs an explicit restart afterwards
+    # for the dashboard widgets to actually pick up fresh keys.
+    if env_true("RESTART_HOMEPAGE") and pushed:
+        NS = os.environ["NS"]
+        K8S_API = "https://kubernetes.default.svc"
+        SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
+        with open(f"{SA_DIR}/token") as f:
+            k8s_token = f.read().strip()
+        k8s_ca = f"{SA_DIR}/ca.crt"
+        k8s_headers = {"Authorization": f"Bearer {k8s_token}"}
+
+        def get_homepage_secret_data():
+            resp = requests.get(
+                f"{K8S_API}/api/v1/namespaces/{NS}/secrets/homepage-api-keys",
+                headers=k8s_headers,
+                verify=k8s_ca,
+                timeout=15,
+            )
+            if resp.status_code == 404:
+                return {}
+            resp.raise_for_status()
+            data = resp.json().get("data", {})
+            import base64
+
+            return {k: base64.b64decode(v).decode(errors="replace") for k, v in data.items()}
+
+        print("Waiting for the Infisical Operator to sync homepage-api-keys...")
+        synced = False
+        for _ in range(24):  # up to ~2 minutes
+            current = get_homepage_secret_data()
+            if all(current.get(k) == v for k, v in pushed.items()):
+                synced = True
+                break
+            time.sleep(5)
+
+        if synced:
+            print("homepage-api-keys is up to date.")
+        else:
+            print(
+                "[warn] homepage-api-keys didn't catch up in time - restarting "
+                "Homepage anyway, but it may still need another restart once "
+                "the Operator's next resync lands."
+            )
+
+        print("Restarting Homepage to pick up fresh keys...")
+        import datetime
+
+        patch_body = {
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "annotations": {
+                            "homelab.io/restartedAt": datetime.datetime.utcnow().isoformat()
+                        }
+                    }
+                }
+            }
+        }
+        resp = requests.patch(
+            f"{K8S_API}/apis/apps/v1/namespaces/{NS}/deployments/homepage",
+            headers={**k8s_headers, "Content-Type": "application/strategic-merge-patch+json"},
+            verify=k8s_ca,
+            json=patch_body,
+            timeout=15,
+        )
+        if resp.ok:
+            print("Homepage restart triggered.")
+        else:
+            print(f"[warn] failed to restart Homepage: {resp.status_code} {resp.text}")
 {{- end }}
