@@ -1,9 +1,11 @@
+{{- if .Values.bazarr.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: bazarr
+  namespace: {{ .Release.Namespace }}
   labels:
-    app: bazarr
+    {{- include "homelab.labels" (dict "name" "bazarr" "Release" .Release) | nindent 4 }}
 spec:
   replicas: 1
   selector:
@@ -16,14 +18,14 @@ spec:
     spec:
       containers:
         - name: bazarr
-          image: lscr.io/linuxserver/bazarr:latest
+          image: {{ .Values.bazarr.image }}
           env:
             - name: PUID
               value: "1000"
             - name: PGID
               value: "1000"
             - name: TZ
-              value: "America/Bogota"
+              value: {{ .Values.global.timezone | quote }}
           ports:
             - containerPort: 6767
               name: http
@@ -34,23 +36,10 @@ spec:
               name: media-tvshows
       volumes:
         - name: bazarr-config
-          hostPath:
-            path: /srv/bazarr/config
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: bazarr-config-pvc
         - name: media-tvshows
           hostPath:
-            path: /srv/media/tv
+            path: {{ .Values.bazarr.storage.tvPath }}
             type: Directory
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: bazarr-service
-spec:
-  type: NodePort
-  selector:
-    app: bazarr
-  ports:
-    - port: 6767
-      targetPort: 6767
-      nodePort: 30767
+{{- end }}

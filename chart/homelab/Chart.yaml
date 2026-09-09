@@ -1,0 +1,12 @@
+apiVersion: v2
+name: homelab
+description: Single-node microk8s homelab stack (media/automation/network apps) with Infisical-backed secrets and an auto-configured Homepage dashboard
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: secrets-operator
+    version: ">=0.0.0-0"
+    repository: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
+    alias: infisical-secrets-operator
+    condition: infisicalOperator.enabled

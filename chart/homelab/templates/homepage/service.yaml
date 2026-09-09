@@ -1,0 +1,19 @@
+{{- if .Values.homepage.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: homepage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "homelab.labels" (dict "name" "homepage" "Release" .Release) | nindent 4 }}
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: homepage
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
+      nodePort: {{ .Values.homepage.service.nodePort }}
+{{- end }}

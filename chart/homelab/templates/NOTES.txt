@@ -1,0 +1,42 @@
+Homelab stack deployed into namespace "{{ .Release.Namespace }}".
+
+Enabled apps:
+{{- if .Values.jellyfin.enabled }}
+  - Jellyfin:      http://{{ .Values.global.lanHost }}:{{ .Values.jellyfin.service.nodePort }}/
+{{- end }}
+{{- if .Values.immich.enabled }}
+  - Immich:        http://{{ .Values.global.lanHost }}:{{ .Values.immich.service.nodePort }}/
+{{- end }}
+{{- if .Values.jellyseerr.enabled }}
+  - Jellyseerr:    http://{{ .Values.global.lanHost }}:{{ .Values.jellyseerr.service.nodePort }}/
+{{- end }}
+{{- if .Values.sonarr.enabled }}
+  - Sonarr:        http://{{ .Values.global.lanHost }}:{{ .Values.sonarr.service.nodePort }}/
+{{- end }}
+{{- if .Values.prowlarr.enabled }}
+  - Prowlarr:      http://{{ .Values.global.lanHost }}:{{ .Values.prowlarr.service.nodePort }}/
+{{- end }}
+{{- if .Values.bazarr.enabled }}
+  - Bazarr:        http://{{ .Values.global.lanHost }}:{{ .Values.bazarr.service.nodePort }}/
+{{- end }}
+{{- if .Values.qbittorrent.enabled }}
+  - qBittorrent:   http://{{ .Values.global.lanHost }}:{{ .Values.qbittorrent.service.webuiNodePort }}/
+{{- end }}
+{{- if .Values.pihole.enabled }}
+  - Pi-hole:       http://{{ .Values.global.lanHost }}:{{ .Values.pihole.webPort }}/admin/
+{{- end }}
+{{- if .Values.homepage.enabled }}
+  - Homepage:      http://{{ .Values.global.lanHost }}:{{ .Values.homepage.service.nodePort }}/{{ if .Values.homepage.ingress.enabled }} (also https://{{ .Values.global.domain }}/){{ end }}
+{{- end }}
+
+A post-install Job ("secret-sync") just pulled/generated each enabled app's API
+key and pushed it to Infisical (project {{ .Values.infisical.projectId }},
+env "{{ .Values.infisical.environmentSlug }}"). Check its logs if Homepage's
+widgets come up without data:
+
+  kubectl -n {{ .Release.Namespace }} logs job/secret-sync
+
+The Infisical Operator then syncs those keys back into the "homepage-api-keys"
+Secret (see: kubectl -n {{ .Release.Namespace }} get infisicalsecret) which
+Homepage reads on a {{ .Values.infisical.resyncInterval }}s interval — allow a
+minute after first install for widgets to populate.

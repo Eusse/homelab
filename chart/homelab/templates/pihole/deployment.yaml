@@ -1,10 +1,11 @@
+{{- if .Values.pihole.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: pihole
-  namespace: default
+  namespace: {{ .Release.Namespace }}
   labels:
-    app: pihole
+    {{- include "homelab.labels" (dict "name" "pihole" "Release" .Release) | nindent 4 }}
 spec:
   replicas: 1
   selector:
@@ -19,19 +20,18 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: pihole
-          image: pihole/pihole:latest
+          image: {{ .Values.pihole.image }}
           securityContext:
             runAsUser: 0
           env:
             - name: TZ
-              value: "America/New_York"
+              value: {{ .Values.pihole.timezone | quote }}
             - name: FTLCONF_webserver_active
               value: "true"
-            # Set webserver port to 8080 for HTTP and 8443 for HTTPS
             - name: FTLCONF_webserver_port
-              value: "8080,8443s"
+              value: {{ printf "%v,%vs" .Values.pihole.webPort "8443" | quote }}
             - name: FTLCONF_webserver_api_password
-              value: "admin"
+              value: {{ .Values.pihole.webPassword | quote }}
             - name: FTLCONF_webserver_domain
               value: ""
           volumeMounts:
@@ -40,5 +40,6 @@ spec:
       volumes:
         - name: pihole-config
           hostPath:
-            path: /srv/pihole/data
+            path: {{ .Values.pihole.storage.configPath }}
             type: DirectoryOrCreate
+{{- end }}

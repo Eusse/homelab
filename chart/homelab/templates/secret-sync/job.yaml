@@ -1,0 +1,100 @@
+{{- if .Values.secretSync.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: secret-sync
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: secret-sync
+          image: {{ .Values.secretSync.image }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip install --quiet --no-cache-dir requests pyyaml && \
+              python /scripts/sync_and_wire.py
+          env:
+            - name: INFISICAL_HOST_API
+              value: {{ .Values.infisical.hostAPI | quote }}
+            - name: INFISICAL_PROJECT_ID
+              value: {{ .Values.infisical.projectId | quote }}
+            - name: INFISICAL_ENV_SLUG
+              value: {{ .Values.infisical.environmentSlug | quote }}
+            - name: INFISICAL_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "homelab.infisicalSecretName" . }}
+                  key: clientId
+            - name: INFISICAL_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "homelab.infisicalSecretName" . }}
+                  key: clientSecret
+            - name: SYNC_SONARR
+              value: {{ .Values.sonarr.enabled | quote }}
+            - name: SYNC_PROWLARR
+              value: {{ .Values.prowlarr.enabled | quote }}
+            - name: SYNC_BAZARR
+              value: {{ .Values.bazarr.enabled | quote }}
+            - name: SYNC_QBITTORRENT
+              value: {{ .Values.qbittorrent.enabled | quote }}
+            - name: SYNC_PIHOLE
+              value: {{ .Values.pihole.enabled | quote }}
+            - name: SYNC_JELLYFIN
+              value: {{ .Values.jellyfin.enabled | quote }}
+            - name: SYNC_IMMICH
+              value: {{ .Values.immich.enabled | quote }}
+            - name: JELLYFIN_URL
+              value: "http://jellyfin-service.{{ .Release.Namespace }}.svc.cluster.local:8096"
+            - name: IMMICH_URL
+              value: "http://immich-service.{{ .Release.Namespace }}.svc.cluster.local:2283"
+          envFrom:
+            - secretRef:
+                name: secret-sync-credentials
+          volumeMounts:
+            - mountPath: /scripts
+              name: script
+            {{- if .Values.sonarr.enabled }}
+            - mountPath: /pvc-mounts/sonarr
+              name: sonarr-config
+              readOnly: true
+            {{- end }}
+            {{- if .Values.prowlarr.enabled }}
+            - mountPath: /pvc-mounts/prowlarr
+              name: prowlarr-config
+              readOnly: true
+            {{- end }}
+            {{- if .Values.bazarr.enabled }}
+            - mountPath: /pvc-mounts/bazarr
+              name: bazarr-config
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: script
+          configMap:
+            name: secret-sync-script
+        {{- if .Values.sonarr.enabled }}
+        - name: sonarr-config
+          persistentVolumeClaim:
+            claimName: sonarr-config-pvc
+        {{- end }}
+        {{- if .Values.prowlarr.enabled }}
+        - name: prowlarr-config
+          persistentVolumeClaim:
+            claimName: prowlarr-config-pvc
+        {{- end }}
+        {{- if .Values.bazarr.enabled }}
+        - name: bazarr-config
+          persistentVolumeClaim:
+            claimName: bazarr-config-pvc
+        {{- end }}
+{{- end }}

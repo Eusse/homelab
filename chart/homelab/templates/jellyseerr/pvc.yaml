@@ -1,0 +1,13 @@
+{{- if .Values.jellyseerr.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jellyseerr-config-pvc
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.jellyseerr.storage.configSize }}
+{{- end }}

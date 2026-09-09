@@ -1,0 +1,16 @@
+{{- if .Values.sonarr.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: sonarr
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: sonarr
+  ports:
+    - name: http
+      port: 8989
+      targetPort: 8989
+      nodePort: {{ .Values.sonarr.service.nodePort }}
+{{- end }}

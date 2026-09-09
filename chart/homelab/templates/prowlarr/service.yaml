@@ -1,0 +1,16 @@
+{{- if .Values.prowlarr.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: prowlarr
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: prowlarr
+  ports:
+    - name: http
+      port: 9696
+      targetPort: 9696
+      nodePort: {{ .Values.prowlarr.service.nodePort }}
+{{- end }}

@@ -1,0 +1,17 @@
+{{- if .Values.jellyfin.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellyfin-service
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "homelab.labels" (dict "name" "jellyfin" "Release" .Release) | nindent 4 }}
+spec:
+  type: NodePort
+  selector:
+    app: jellyfin
+  ports:
+    - port: 8096
+      targetPort: 8096
+      nodePort: {{ .Values.jellyfin.service.nodePort }}
+{{- end }}

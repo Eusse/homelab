@@ -1,0 +1,13 @@
+{{- if .Values.qbittorrent.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qbittorrent-config-pvc
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.qbittorrent.storage.configSize }}
+{{- end }}

@@ -1,0 +1,56 @@
+{{- if .Values.immich.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: immich-postgres-credentials
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+stringData:
+  POSTGRES_USER: {{ .Values.immich.postgres.user | quote }}
+  POSTGRES_PASSWORD: {{ .Values.immich.postgres.password | quote }}
+  POSTGRES_DB: {{ .Values.immich.postgres.db | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-postgres
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-postgres
+  template:
+    metadata:
+      labels:
+        app: immich-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.immich.images.postgres }}
+          envFrom:
+            - secretRef:
+                name: immich-postgres-credentials
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgres-storage
+      volumes:
+        - name: postgres-storage
+          hostPath:
+            path: {{ .Values.immich.storage.postgresPath }}
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-postgres
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: immich-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+{{- end }}

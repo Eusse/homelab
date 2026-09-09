@@ -1,22 +1,11 @@
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: jellyseerr-config-pvc
-  namespace: default
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 2Gi
----
+{{- if .Values.jellyseerr.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: jellyseerr
-  namespace: default
+  namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: jellyseerr
+    {{- include "homelab.labels" (dict "name" "jellyseerr" "Release" .Release) | nindent 4 }}
 spec:
   replicas: 1
   selector:
@@ -29,10 +18,10 @@ spec:
     spec:
       containers:
         - name: jellyseerr
-          image: fallenbagel/jellyseerr:latest
+          image: {{ .Values.jellyseerr.image }}
           env:
             - name: TZ
-              value: "America/Bogota"
+              value: {{ .Values.global.timezone | quote }}
             - name: PORT
               value: "5055"
           ports:
@@ -45,18 +34,4 @@ spec:
         - name: config
           persistentVolumeClaim:
             claimName: jellyseerr-config-pvc
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: jellyseerr
-  namespace: default
-spec:
-  type: NodePort
-  selector:
-    app.kubernetes.io/name: jellyseerr
-  ports:
-    - name: http
-      port: 5055
-      targetPort: 5055
-      nodePort: 30055
+{{- end }}

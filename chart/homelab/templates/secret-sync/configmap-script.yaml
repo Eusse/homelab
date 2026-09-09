@@ -1,0 +1,155 @@
+{{- if .Values.secretSync.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: secret-sync-script
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "8"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+data:
+  sync_and_wire.py: |
+    import os
+    import sys
+    import time
+    import xml.etree.ElementTree as ET
+    import yaml
+    import requests
+
+    INFISICAL_HOST = os.environ["INFISICAL_HOST_API"]
+    PROJECT_ID = os.environ["INFISICAL_PROJECT_ID"]
+    ENV_SLUG = os.environ.get("INFISICAL_ENV_SLUG", "prod")
+    CLIENT_ID = os.environ["INFISICAL_CLIENT_ID"]
+    CLIENT_SECRET = os.environ["INFISICAL_CLIENT_SECRET"]
+
+    def get_access_token():
+        resp = requests.post(
+            f"{INFISICAL_HOST}/api/v1/auth/universal-auth/login",
+            json={"clientId": CLIENT_ID, "clientSecret": CLIENT_SECRET},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        return resp.json()["accessToken"]
+
+    def upsert_secret(token, key, value):
+        if not value:
+            print(f"[Infisical] Skipping {key} (no value)")
+            return
+        headers = {"Authorization": f"Bearer {token}"}
+        body = {
+            "workspaceId": PROJECT_ID,
+            "environment": ENV_SLUG,
+            "secretPath": "/",
+            "secretValue": value,
+        }
+        resp = requests.post(
+            f"{INFISICAL_HOST}/api/v3/secrets/raw/{key}",
+            json=body,
+            headers=headers,
+            timeout=15,
+        )
+        if resp.status_code in (200, 201):
+            print(f"[Infisical] Created {key}")
+            return
+        resp = requests.patch(
+            f"{INFISICAL_HOST}/api/v3/secrets/raw/{key}",
+            json=body,
+            headers=headers,
+            timeout=15,
+        )
+        if resp.ok:
+            print(f"[Infisical] Updated {key}")
+        else:
+            print(f"[Infisical] Failed to sync {key}: {resp.status_code} {resp.text}")
+
+    def wait_for_file(path, attempts=30, delay=2):
+        for _ in range(attempts):
+            if os.path.exists(path):
+                return True
+            time.sleep(delay)
+        return False
+
+    def get_xml_key(path):
+        try:
+            if not wait_for_file(path):
+                return None
+            return ET.parse(path).getroot().find("ApiKey").text
+        except Exception as e:
+            print(f"[warn] could not read {path}: {e}")
+            return None
+
+    def get_bazarr_key(path):
+        try:
+            if not wait_for_file(path):
+                return None
+            with open(path) as f:
+                return yaml.safe_load(f).get("analytics", {}).get("apikey")
+        except Exception as e:
+            print(f"[warn] could not read {path}: {e}")
+            return None
+
+    def env_true(name):
+        return os.environ.get(name, "false").lower() == "true"
+
+    secrets_manifest = {}
+
+    if env_true("SYNC_SONARR"):
+        secrets_manifest["SONARR_API_KEY"] = get_xml_key("/pvc-mounts/sonarr/config.xml")
+
+    if env_true("SYNC_PROWLARR"):
+        secrets_manifest["PROWLARR_API_KEY"] = get_xml_key("/pvc-mounts/prowlarr/config.xml")
+
+    if env_true("SYNC_BAZARR"):
+        secrets_manifest["BAZARR_API_KEY"] = get_bazarr_key("/pvc-mounts/bazarr/config.yaml")
+
+    if env_true("SYNC_QBITTORRENT"):
+        secrets_manifest["QBITTORRENT_USER"] = os.environ.get("QBIT_USER", "admin")
+        secrets_manifest["QBITTORRENT_PASS"] = os.environ.get("QBIT_PASS", "")
+
+    if env_true("SYNC_PIHOLE"):
+        secrets_manifest["PIHOLE_API_KEY"] = os.environ.get("PIHOLE_WEBPASSWORD_HASH")
+
+    if env_true("SYNC_JELLYFIN"):
+        try:
+            jellyfin_url = os.environ["JELLYFIN_URL"]
+            auth_resp = requests.post(
+                f"{jellyfin_url}/Users/AuthenticateByName",
+                json={
+                    "Username": os.environ["JELLYFIN_ADMIN_USER"],
+                    "Pw": os.environ["JELLYFIN_ADMIN_PASS"],
+                },
+                headers={
+                    "X-Emby-Authorization": 'MediaBrowser Client="SyncScript", Device="K8s", DeviceId="1", Version="1.0"'
+                },
+                timeout=15,
+            ).json()
+            token = auth_resp["AccessToken"]
+            key_resp = requests.post(
+                f"{jellyfin_url}/Auth/Keys?app=Homepage",
+                headers={"X-Emby-Token": token},
+                timeout=15,
+            ).json()
+            secrets_manifest["JELLYFIN_API_KEY"] = key_resp.get("AccessToken")
+        except Exception as e:
+            print(f"[Jellyfin Key Gen Error]: {e}")
+
+    if env_true("SYNC_IMMICH"):
+        try:
+            immich_url = os.environ["IMMICH_URL"]
+            immich_key_resp = requests.post(
+                f"{immich_url}/api/api-key",
+                headers={"x-api-key": os.environ["IMMICH_ADMIN_KEY"]},
+                json={"name": "Homepage Dashboard Key"},
+                timeout=15,
+            ).json()
+            secrets_manifest["IMMICH_API_KEY"] = immich_key_resp.get("secret")
+        except Exception as e:
+            print(f"[Immich Key Gen Error]: {e}")
+
+    token = get_access_token()
+    for k, v in secrets_manifest.items():
+        upsert_secret(token, k, v)
+
+    print("Secret sync complete.")
+{{- end }}

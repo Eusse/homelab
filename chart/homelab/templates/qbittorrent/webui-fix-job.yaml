@@ -1,0 +1,96 @@
+{{- if and .Values.qbittorrent.enabled .Values.qbittorrent.webuiFix.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: qbittorrent-webui-fix
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "4"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: qbittorrent-webui-fix
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "4"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale"]
+    resourceNames: ["qbittorrent"]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: qbittorrent-webui-fix
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "4"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: qbittorrent-webui-fix
+subjects:
+  - kind: ServiceAccount
+    name: qbittorrent-webui-fix
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: qbittorrent-webui-fix
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: qbittorrent-webui-fix
+      restartPolicy: Never
+      containers:
+        - name: webui-fix
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              CONF_FILE=""
+              for i in $(seq 1 30); do
+                CONF_FILE=$(find /config -name "qBittorrent.conf" 2>/dev/null | head -n 1)
+                [ -n "$CONF_FILE" ] && break
+                echo "Waiting for qBittorrent.conf to be generated ($i/30)..."
+                sleep 2
+              done
+              if [ -z "$CONF_FILE" ]; then
+                echo "qBittorrent.conf not found within time limit, skipping."
+                exit 0
+              fi
+              if grep -q "WebUI\\HostHeaderValidation" "$CONF_FILE"; then
+                echo "WebUI Host Header Validation bypass already applied."
+                exit 0
+              fi
+              echo "Found $CONF_FILE. Disabling WebUI Host Header Validation..."
+              kubectl -n {{ .Release.Namespace }} scale deployment qbittorrent --replicas=0
+              kubectl -n {{ .Release.Namespace }} wait --for=delete pod -l app.kubernetes.io/name=qbittorrent --timeout=60s || true
+              sed -i '/\[Preferences\]/a WebUI\\HostHeaderValidation=false\nWebUI\\CSRFProtection=false' "$CONF_FILE"
+              kubectl -n {{ .Release.Namespace }} scale deployment qbittorrent --replicas=1
+              echo "qBittorrent Web UI bypass successfully applied!"
+          volumeMounts:
+            - mountPath: /config
+              name: config
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: qbittorrent-config-pvc
+{{- end }}

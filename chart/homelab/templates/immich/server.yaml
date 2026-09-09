@@ -1,0 +1,66 @@
+{{- if .Values.immich.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-server
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-server
+  template:
+    metadata:
+      labels:
+        app: immich-server
+    spec:
+      containers:
+        - name: immich-server
+          image: {{ .Values.immich.images.server }}
+          env:
+            - name: DB_HOSTNAME
+              value: "immich-postgres"
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: immich-postgres-credentials
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: immich-postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: DB_DATABASE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: immich-postgres-credentials
+                  key: POSTGRES_DB
+            - name: REDIS_HOSTNAME
+              value: "immich-redis"
+            - name: IMMICH_MACHINE_LEARNING_URL
+              value: "http://immich-machine-learning:3003"
+          ports:
+            - containerPort: 2283
+          volumeMounts:
+            - mountPath: /usr/src/app/upload
+              name: upload-storage
+      volumes:
+        - name: upload-storage
+          hostPath:
+            path: {{ .Values.immich.storage.uploadPath }}
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-service
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: NodePort
+  selector:
+    app: immich-server
+  ports:
+    - port: 2283
+      targetPort: 2283
+      nodePort: {{ .Values.immich.service.nodePort }}
+{{- end }}

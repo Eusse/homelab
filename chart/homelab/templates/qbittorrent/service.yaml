@@ -1,0 +1,21 @@
+{{- if .Values.qbittorrent.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: qbittorrent
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: qbittorrent
+  ports:
+    - name: webui
+      port: {{ .Values.qbittorrent.service.webuiNodePort }}
+      targetPort: {{ .Values.qbittorrent.service.webuiNodePort }}
+      nodePort: {{ .Values.qbittorrent.service.webuiNodePort }}
+    - name: torrent-tcp
+      port: 6881
+      targetPort: 6881
+      protocol: TCP
+      nodePort: {{ .Values.qbittorrent.service.torrentNodePort }}
+{{- end }}

@@ -1,0 +1,16 @@
+{{- if .Values.jellyseerr.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellyseerr
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: jellyseerr
+  ports:
+    - name: http
+      port: 5055
+      targetPort: 5055
+      nodePort: {{ .Values.jellyseerr.service.nodePort }}
+{{- end }}
