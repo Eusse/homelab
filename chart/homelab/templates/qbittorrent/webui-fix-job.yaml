@@ -80,6 +80,12 @@ spec:
       containers:
         - name: webui-fix
           image: bitnami/kubectl:latest
+          imagePullPolicy: IfNotPresent
+          # bitnami images run as a non-root user by default; qBittorrent.conf
+          # is owned by PUID=1000 (the linuxserver/qbittorrent image's user),
+          # so editing it with `sed -i` needs root here regardless.
+          securityContext:
+            runAsUser: 0
           command:
             - /bin/bash
             - -c

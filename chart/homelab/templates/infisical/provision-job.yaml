@@ -74,6 +74,7 @@ spec:
       containers:
         - name: infisical-provision
           image: bitnami/kubectl:latest
+          imagePullPolicy: IfNotPresent
           env:
             - name: NS
               value: {{ .Release.Namespace | quote }}
