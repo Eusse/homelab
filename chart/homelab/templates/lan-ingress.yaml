@@ -38,4 +38,8 @@
 ---
 {{ include "homelab.lanIngressRule" (dict "name" "pihole" "namespace" $ns "ingressClassName" $ic "host" (printf "pihole.%s" $base) "serviceName" "pihole-web" "servicePort" (.Values.pihole.webPort | int)) }}
 {{- end }}
+{{- if .Values.infisicalServer.enabled }}
+---
+{{ include "homelab.lanIngressRule" (dict "name" "infisical" "namespace" $ns "ingressClassName" $ic "host" (printf "infisical.%s" $base) "serviceName" "infisical-server" "servicePort" 8080) }}
+{{- end }}
 {{- end }}

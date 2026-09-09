@@ -1,0 +1,166 @@
+{{- if .Values.infisicalServer.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: infisical-provision
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "14"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: infisical-provision
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "14"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "create", "update", "patch"]
+  - apiGroups: ["secrets.infisical.com"]
+    resources: ["infisicalsecrets"]
+    verbs: ["get", "list", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: infisical-provision
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "14"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: infisical-provision
+subjects:
+  - kind: ServiceAccount
+    name: infisical-provision
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: infisical-provision
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "15"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: infisical-provision
+      restartPolicy: Never
+      containers:
+        - name: infisical-provision
+          image: bitnami/kubectl:latest
+          env:
+            - name: NS
+              value: {{ .Release.Namespace | quote }}
+            - name: API
+              value: {{ .Values.infisical.hostAPI | quote }}
+            - name: ENV_SLUG
+              value: {{ .Values.infisical.environmentSlug | quote }}
+            - name: RESYNC_INTERVAL
+              value: {{ .Values.infisical.resyncInterval | quote }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              apt-get update -qq && apt-get install -y -qq curl jq >/dev/null
+
+              # Idempotent: a previous run (or a prior helm install) may have
+              # already provisioned everything.
+              if kubectl -n "$NS" get secret infisical-credentials -o jsonpath='{.data.clientId}' 2>/dev/null | grep -q .; then
+                echo "infisical-credentials already populated, skipping provisioning."
+                exit 0
+              fi
+
+              echo "Waiting for Infisical's own bootstrap secret..."
+              for i in $(seq 1 60); do
+                kubectl -n "$NS" get secret infisical-bootstrap-secret >/dev/null 2>&1 && break
+                sleep 5
+              done
+              TOKEN=$(kubectl -n "$NS" get secret infisical-bootstrap-secret -o jsonpath='{.data.token}' | base64 -d)
+              ORG_ID=$(kubectl -n "$NS" get secret infisical-bootstrap-secret -o jsonpath='{.data.organizationId}' | base64 -d)
+              if [ -z "$TOKEN" ] || [ -z "$ORG_ID" ]; then
+                echo "infisical-bootstrap-secret is missing token/organizationId, aborting."
+                exit 1
+              fi
+              AUTH="Authorization: Bearer $TOKEN"
+
+              echo "Waiting for Infisical API to answer..."
+              for i in $(seq 1 30); do
+                curl -sf "$API/api/status" >/dev/null 2>&1 && break
+                sleep 5
+              done
+
+              echo "Creating project..."
+              PROJECT=$(curl -sf -X POST "$API/api/v1/projects" \
+                -H "$AUTH" -H "Content-Type: application/json" \
+                -d '{"projectName":"homelab"}')
+              PROJECT_ID=$(echo "$PROJECT" | jq -r '.project.id')
+
+              echo "Creating machine identity..."
+              IDENTITY=$(curl -sf -X POST "$API/api/v1/identities" \
+                -H "$AUTH" -H "Content-Type: application/json" \
+                -d "{\"name\":\"homelab-sync\",\"organizationId\":\"$ORG_ID\",\"role\":\"admin\"}")
+              IDENTITY_ID=$(echo "$IDENTITY" | jq -r '.identity.id')
+
+              echo "Attaching Universal Auth..."
+              UA=$(curl -sf -X POST "$API/api/v1/auth/universal-auth/identities/$IDENTITY_ID" \
+                -H "$AUTH" -H "Content-Type: application/json" -d '{}')
+              CLIENT_ID=$(echo "$UA" | jq -r '.identityUniversalAuth.clientId')
+
+              echo "Creating client secret..."
+              SECRET=$(curl -sf -X POST "$API/api/v1/auth/universal-auth/identities/$IDENTITY_ID/client-secrets" \
+                -H "$AUTH" -H "Content-Type: application/json" -d '{}')
+              CLIENT_SECRET=$(echo "$SECRET" | jq -r '.clientSecret')
+
+              echo "Granting the identity access to the project..."
+              curl -sf -X POST "$API/api/v1/projects/$PROJECT_ID/memberships/identities/$IDENTITY_ID" \
+                -H "$AUTH" -H "Content-Type: application/json" -d '{"role":"admin"}' >/dev/null
+
+              echo "Writing infisical-credentials Secret..."
+              kubectl -n "$NS" create secret generic infisical-credentials \
+                --from-literal=clientId="$CLIENT_ID" \
+                --from-literal=clientSecret="$CLIENT_SECRET" \
+                --from-literal=projectId="$PROJECT_ID" \
+                --dry-run=client -o yaml | kubectl apply -f -
+
+              echo "Creating InfisicalSecret sync CR for Homepage..."
+              printf '%s\n' \
+                "apiVersion: secrets.infisical.com/v1alpha1" \
+                "kind: InfisicalSecret" \
+                "metadata:" \
+                "  name: homepage-infisical-sync" \
+                "  namespace: $NS" \
+                "spec:" \
+                "  hostAPI: $API" \
+                "  resyncInterval: $RESYNC_INTERVAL" \
+                "  authentication:" \
+                "    universalAuth:" \
+                "      credentialsRef:" \
+                "        secretName: infisical-credentials" \
+                "        secretNamespace: $NS" \
+                "      secretsScope:" \
+                "        projectId: \"$PROJECT_ID\"" \
+                "        envSlug: \"$ENV_SLUG\"" \
+                "        secretsPath: \"/\"" \
+                "  managedSecretReference:" \
+                "    secretName: homepage-api-keys" \
+                "    secretNamespace: $NS" \
+                "    creationPolicy: Owner" \
+                | kubectl apply -f -
+
+              echo "Infisical provisioning complete. Project ID: $PROJECT_ID"
+{{- end }}

@@ -30,6 +30,9 @@ Enabled apps:
 {{- if .Values.homepage.enabled }}
   - Homepage:      http://{{ .Values.global.lanHost }}:{{ .Values.homepage.service.nodePort }}/{{ if $lan }} (or http://homepage.{{ $base }}/){{ end }}{{ if .Values.homepage.ingress.enabled }} (also https://{{ .Values.global.domain }}/){{ end }}
 {{- end }}
+{{- if .Values.infisicalServer.enabled }}
+  - Infisical:     {{ if $lan }}http://infisical.{{ $base }}/{{ else }}kubectl -n {{ .Release.Namespace }} port-forward svc/infisical-server 8080:8080{{ end }} (login: {{ .Values.infisicalServerBootstrapAdmin.email }})
+{{- end }}
 
 {{- if $lan }}
 
@@ -40,10 +43,21 @@ README.md's "LAN hostnames" section for how to add it in Pi-hole (or your
 router), or use the NodePort link on the left instead.
 {{- end }}
 
-A post-install Job ("secret-sync") just pulled/generated each enabled app's API
-key and pushed it to Infisical (project {{ .Values.infisical.projectId }},
-env "{{ .Values.infisical.environmentSlug }}"). Check its logs if Homepage's
-widgets come up without data:
+{{- if .Values.infisicalServer.enabled }}
+
+Infisical was deployed and provisioned automatically (its own admin user,
+org, project, and machine identity) - no manual setup needed. See:
+
+  kubectl -n {{ .Release.Namespace }} logs job/{{ .Release.Name }}-bootstrap-{{ .Release.Revision }}   # Infisical's own admin/org bootstrap
+  kubectl -n {{ .Release.Namespace }} logs job/infisical-provision   # this chart's project/identity setup
+
+if either failed. On first install this can take a few minutes (Postgres +
+Redis + the app all need to come up before these jobs can run).
+{{- end }}
+
+A post-install Job ("secret-sync") pulled/generated each enabled app's API
+key and pushed it to Infisical (env "{{ .Values.infisical.environmentSlug }}").
+Check its logs if Homepage's widgets come up without data:
 
   kubectl -n {{ .Release.Namespace }} logs job/secret-sync
 

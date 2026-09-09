@@ -6,7 +6,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   annotations:
     helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-weight: "10"
+    helm.sh/hook-weight: "25"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
   backoffLimit: 2
@@ -26,7 +26,10 @@ spec:
             - name: INFISICAL_HOST_API
               value: {{ .Values.infisical.hostAPI | quote }}
             - name: INFISICAL_PROJECT_ID
-              value: {{ .Values.infisical.projectId | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "homelab.infisicalSecretName" . }}
+                  key: projectId
             - name: INFISICAL_ENV_SLUG
               value: {{ .Values.infisical.environmentSlug | quote }}
             - name: INFISICAL_CLIENT_ID

@@ -10,3 +10,8 @@ dependencies:
     repository: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
     alias: infisical-secrets-operator
     condition: infisicalOperator.enabled
+  - name: infisical-standalone
+    version: ">=0.0.0-0"
+    repository: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
+    alias: infisical-server
+    condition: infisicalServer.enabled

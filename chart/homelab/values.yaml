@@ -27,9 +27,58 @@ global:
 infisicalOperator:
   enabled: true
 
-# --- Infisical project this cluster syncs secrets from/to ---
+# --- Self-hosted Infisical server (installed as a chart dependency).
+# When enabled (the default), the chart deploys its own Infisical instance
+# (app + bundled Postgres + Redis) and fully automates project/machine-identity
+# setup - see README.md's "Self-hosted Infisical (default)" section. Set to
+# false if you already run Infisical elsewhere and want to fill in
+# infisical.projectId/clientId/clientSecret yourself instead. ---
+infisicalServer:
+  enabled: true
+
+# Values for the infisical-standalone dependency itself (aliased infisical-server).
+# Kept minimal on purpose: bundled postgres/redis, no bundled ingress-nginx
+# (this stack already has one via the microk8s "ingress" addon).
+infisical-server:
+  infisical:
+    fullnameOverride: "infisical-server"
+    replicaCount: 1
+    autoBootstrap:
+      enabled: true
+      organization: "homelab"
+      secretDestination:
+        name: infisical-bootstrap-secret
+        # Empty on purpose: the subchart falls back to the release namespace
+        # only when this is empty - its own default value is the literal
+        # string "default", which would silently write the secret there.
+        namespace: ""
+      # Adds organizationId alongside the default token, so the provisioning
+      # job below doesn't need a separate API call to look it up.
+      secretTemplate: |
+        {"data":{"token":"{{ .Identity.Credentials.Token }}","organizationId":"{{ .Organization.ID }}"}}
+      credentialSecret:
+        name: infisical-bootstrap-credentials
+  ingress:
+    enabled: false
+    nginx:
+      enabled: false
+  postgresql:
+    enabled: true
+  redis:
+    enabled: true
+
+# --- Admin account the self-hosted Infisical instance bootstraps itself
+# with on first install (infisicalServer.enabled only). Real password
+# belongs in an untracked values file, not here. ---
+infisicalServerBootstrapAdmin:
+  email: admin@homelab.local
+  password: ""
+
+# --- Infisical project this cluster syncs secrets from/to. Ignored (auto-filled
+# into the `infisical-credentials` Secret instead) when infisicalServer.enabled
+# is true - see above. ---
 infisical:
-  hostAPI: http://infisical-standalone-postgres.default.svc.cluster.local:8080
+  hostAPI: http://infisical-server:8080
   projectId: ""
   environmentSlug: prod
   resyncInterval: 60
