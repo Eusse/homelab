@@ -27,7 +27,7 @@ rules:
     verbs: ["get"]
   - apiGroups: ["apps"]
     resources: ["deployments"]
-    resourceNames: ["homepage"]
+    resourceNames: ["homepage", "jellyfin"]
     verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -135,6 +135,13 @@ spec:
               name: bazarr-config
               readOnly: true
             {{- end }}
+            {{- if .Values.jellyfin.enabled }}
+            - mountPath: /mnt/jellyfin-config
+              name: jellyfin-config
+              # Read-write: this job edits system.xml directly to enable
+              # legacy authorization (see the script) - see values.yaml for
+              # why nothing short of that works with recent Jellyfin.
+            {{- end }}
       volumes:
         - name: script
           configMap:
@@ -153,5 +160,11 @@ spec:
         - name: bazarr-config
           persistentVolumeClaim:
             claimName: bazarr-config-pvc
+        {{- end }}
+        {{- if .Values.jellyfin.enabled }}
+        - name: jellyfin-config
+          hostPath:
+            path: {{ .Values.jellyfin.storage.configPath }}
+            type: Directory
         {{- end }}
 {{- end }}

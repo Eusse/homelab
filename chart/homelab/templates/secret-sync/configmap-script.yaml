@@ -13,7 +13,10 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 data:
   sync_and_wire.py: |
+    import base64
+    import datetime
     import os
+    import re
     import sys
     import time
     import xml.etree.ElementTree as ET
@@ -25,6 +28,38 @@ data:
     ENV_SLUG = os.environ.get("INFISICAL_ENV_SLUG", "prod")
     CLIENT_ID = os.environ["INFISICAL_CLIENT_ID"]
     CLIENT_SECRET = os.environ["INFISICAL_CLIENT_SECRET"]
+
+    NS = os.environ["NS"]
+    K8S_API = "https://kubernetes.default.svc"
+    SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
+    with open(f"{SA_DIR}/token") as f:
+        K8S_TOKEN = f.read().strip()
+    K8S_CA = f"{SA_DIR}/ca.crt"
+    K8S_HEADERS = {"Authorization": f"Bearer {K8S_TOKEN}"}
+
+    def k8s_restart_deployment(name):
+        resp = requests.patch(
+            f"{K8S_API}/apis/apps/v1/namespaces/{NS}/deployments/{name}",
+            headers={**K8S_HEADERS, "Content-Type": "application/strategic-merge-patch+json"},
+            verify=K8S_CA,
+            json={
+                "spec": {
+                    "template": {
+                        "metadata": {
+                            "annotations": {
+                                "homelab.io/restartedAt": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                            }
+                        }
+                    }
+                }
+            },
+            timeout=15,
+        )
+        if resp.ok:
+            print(f"{name} restart triggered.")
+        else:
+            print(f"[warn] failed to restart {name}: {resp.status_code} {resp.text}")
+        return resp.ok
 
     def get_access_token():
         resp = requests.post(
@@ -129,12 +164,94 @@ data:
     if env_true("SYNC_JELLYFIN"):
         try:
             jellyfin_url = os.environ["JELLYFIN_URL"]
+            jf_user = os.environ["JELLYFIN_ADMIN_USER"]
+            jf_pass = os.environ["JELLYFIN_ADMIN_PASS"]
+
+            print("Waiting for Jellyfin to answer...")
+            info = None
+            for _ in range(30):
+                try:
+                    resp = requests.get(f"{jellyfin_url}/System/Info/Public", timeout=5)
+                    if resp.ok:
+                        info = resp.json()
+                        break
+                except requests.RequestException:
+                    pass
+                time.sleep(2)
+            if info is None:
+                raise RuntimeError("Jellyfin never answered /System/Info/Public")
+
+            # Jellyfin's first-run setup wizard normally requires clicking
+            # through it in a browser to create the admin account - but its
+            # /Startup/* endpoints are explicitly allowed unauthenticated
+            # while the wizard is incomplete (confirmed in Jellyfin's own
+            # StartupController source), so we can drive it directly instead.
+            if not info.get("StartupWizardCompleted"):
+                print("Jellyfin's setup wizard hasn't run yet - completing it via its unauthenticated first-run API...")
+                resp = requests.post(
+                    f"{jellyfin_url}/Startup/User",
+                    json={"Name": jf_user, "Password": jf_pass},
+                    timeout=15,
+                )
+                if not resp.ok:
+                    print(f"[Jellyfin Setup Error]: /Startup/User failed with {resp.status_code} {resp.text!r}")
+                resp = requests.post(f"{jellyfin_url}/Startup/Complete", timeout=15)
+                if not resp.ok:
+                    print(f"[Jellyfin Setup Error]: /Startup/Complete failed with {resp.status_code} {resp.text!r}")
+                else:
+                    print("Jellyfin admin account created and wizard completed.")
+
+            # Jellyfin 10.12+ defaults EnableLegacyAuthorization to false,
+            # which blocks the password login below (confirmed: same change
+            # that broke Jellyseerr's Jellyfin integration, jellyfin#15962).
+            # Fix it directly in system.xml (confirmed path and root element
+            # name against Jellyfin's own source - BaseApplicationPaths and
+            # ServerConfiguration) using plain text substitution rather than
+            # re-serializing the whole file, so nothing else in it is
+            # touched.
+            system_xml = "/mnt/jellyfin-config/system.xml"
+            if wait_for_file(system_xml):
+                with open(system_xml) as f:
+                    xml_text = f.read()
+                if "<EnableLegacyAuthorization>true</EnableLegacyAuthorization>" in xml_text:
+                    changed = False
+                elif "<EnableLegacyAuthorization>" in xml_text:
+                    xml_text = re.sub(
+                        r"<EnableLegacyAuthorization>.*?</EnableLegacyAuthorization>",
+                        "<EnableLegacyAuthorization>true</EnableLegacyAuthorization>",
+                        xml_text,
+                    )
+                    changed = True
+                elif "</ServerConfiguration>" in xml_text:
+                    xml_text = xml_text.replace(
+                        "</ServerConfiguration>",
+                        "  <EnableLegacyAuthorization>true</EnableLegacyAuthorization>\n</ServerConfiguration>",
+                    )
+                    changed = True
+                else:
+                    print(f"[warn] {system_xml} doesn't look like a Jellyfin ServerConfiguration file - leaving it alone")
+                    changed = False
+
+                if changed:
+                    with open(system_xml, "w") as f:
+                        f.write(xml_text)
+                    print("Set EnableLegacyAuthorization=true in system.xml, restarting Jellyfin...")
+                    k8s_restart_deployment("jellyfin")
+                    jellyfin_ready = False
+                    for _ in range(30):
+                        time.sleep(5)
+                        try:
+                            if requests.get(f"{jellyfin_url}/System/Info/Public", timeout=5).ok:
+                                jellyfin_ready = True
+                                break
+                        except requests.RequestException:
+                            pass
+                    if not jellyfin_ready:
+                        print("[warn] Jellyfin didn't come back up within the wait window after restart")
+
             auth_resp = requests.post(
                 f"{jellyfin_url}/Users/AuthenticateByName",
-                json={
-                    "Username": os.environ["JELLYFIN_ADMIN_USER"],
-                    "Pw": os.environ["JELLYFIN_ADMIN_PASS"],
-                },
+                json={"Username": jf_user, "Pw": jf_pass},
                 headers={
                     "X-Emby-Authorization": 'MediaBrowser Client="SyncScript", Device="K8s", DeviceId="1", Version="1.0"'
                 },
@@ -143,8 +260,7 @@ data:
             if not auth_resp.ok:
                 print(
                     f"[Jellyfin Key Gen Error]: login failed with {auth_resp.status_code} "
-                    f"{auth_resp.text!r} - has the admin account in JELLYFIN_ADMIN_USER/PASS "
-                    "actually been created via Jellyfin's first-run setup wizard yet?"
+                    f"{auth_resp.text!r}"
                 )
             else:
                 token = auth_resp.json()["AccessToken"]
@@ -200,27 +316,17 @@ data:
     # above). So every install/upgrade needs an explicit restart afterwards
     # for the dashboard widgets to actually pick up fresh keys.
     if env_true("RESTART_HOMEPAGE") and pushed:
-        NS = os.environ["NS"]
-        K8S_API = "https://kubernetes.default.svc"
-        SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
-        with open(f"{SA_DIR}/token") as f:
-            k8s_token = f.read().strip()
-        k8s_ca = f"{SA_DIR}/ca.crt"
-        k8s_headers = {"Authorization": f"Bearer {k8s_token}"}
-
         def get_homepage_secret_data():
             resp = requests.get(
                 f"{K8S_API}/api/v1/namespaces/{NS}/secrets/homepage-api-keys",
-                headers=k8s_headers,
-                verify=k8s_ca,
+                headers=K8S_HEADERS,
+                verify=K8S_CA,
                 timeout=15,
             )
             if resp.status_code == 404:
                 return {}
             resp.raise_for_status()
             data = resp.json().get("data", {})
-            import base64
-
             return {k: base64.b64decode(v).decode(errors="replace") for k, v in data.items()}
 
         print("Waiting for the Infisical Operator to sync homepage-api-keys...")
@@ -242,28 +348,5 @@ data:
             )
 
         print("Restarting Homepage to pick up fresh keys...")
-        import datetime
-
-        patch_body = {
-            "spec": {
-                "template": {
-                    "metadata": {
-                        "annotations": {
-                            "homelab.io/restartedAt": datetime.datetime.utcnow().isoformat()
-                        }
-                    }
-                }
-            }
-        }
-        resp = requests.patch(
-            f"{K8S_API}/apis/apps/v1/namespaces/{NS}/deployments/homepage",
-            headers={**k8s_headers, "Content-Type": "application/strategic-merge-patch+json"},
-            verify=k8s_ca,
-            json=patch_body,
-            timeout=15,
-        )
-        if resp.ok:
-            print("Homepage restart triggered.")
-        else:
-            print(f"[warn] failed to restart Homepage: {resp.status_code} {resp.text}")
+        k8s_restart_deployment("homepage")
 {{- end }}

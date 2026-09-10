@@ -61,37 +61,35 @@ qbittorrent:
     password: "<pick a real password>"
 
 secretSync:
-  # This account must already exist in Jellyfin - see the note below.
+  # secret-sync creates this account itself - see the note below. Pick
+  # whatever username/password you want Jellyfin's admin to have.
   jellyfin:
-    adminUser: "<jellyfin admin username, once created>"
-    adminPassword: "<jellyfin admin password>"
+    adminUser: "<username to create>"
+    adminPassword: "<password to set>"
 
 pihole:
   webPassword: "<pick a real password>"
 ```
 
-Two of these apps need a **one-time manual step in their own UI** before
-`secret-sync` can mint an API key for them — neither is something a Helm
-chart can automate away, since both require interacting with a first-run
-setup flow in a browser:
+**Jellyfin is fully automatic**, unlike every other app here that needs a
+first-run browser step: `secret-sync` drives Jellyfin's unauthenticated
+`/Startup/*` API directly to create the admin account (the same thing the
+setup wizard does in a browser - confirmed via Jellyfin's own source that
+those endpoints are explicitly open before the wizard completes), then
+edits `system.xml` to enable `EnableLegacyAuthorization` (Jellyfin 10.12+
+disabled username/password API login by default - the same change that
+[broke Jellyseerr's Jellyfin integration](https://github.com/jellyfin/jellyfin/issues/15962) -
+so this chart's `secret-sync` job needs it explicitly enabled to log in and
+mint an API key), restarting Jellyfin if it had to change that file. None
+of this needs you to open Jellyfin's UI at all - just set the username/
+password you want above and it creates that account for you. If it's not
+working, `kubectl -n homelab logs job/secret-sync` will show exactly which
+step failed (`[Jellyfin Setup Error]` or `[Jellyfin Key Gen Error]`).
 
-- **Jellyfin** requires completing its first-run setup wizard (create the
-  admin account) before *any* account exists to authenticate as. Open
-  `http://<node-ip>:32096/` (or its LAN hostname), go through the wizard,
-  and create the admin user with the exact username/password you put in
-  `secretSync.jellyfin`. Until this is done, `JELLYFIN_API_KEY` simply
-  won't appear in Homepage's secret - check `kubectl -n homelab logs
-  job/secret-sync` for `[Jellyfin Key Gen Error]` if you're unsure.
-  Jellyfin 10.12+ also disabled the username/password login `secret-sync`
-  uses by default (`EnableLegacyAuthorization`, added to stop
-  [breaking Jellyseerr the same way](https://github.com/jellyfin/jellyfin/issues/15962)) -
-  if the log shows `login failed with 400 'Error processing request.'`,
-  find `system.xml` (`sudo find /srv/jellyfin -name system.xml`), set
-  `<EnableLegacyAuthorization>true</EnableLegacyAuthorization>` inside
-  `<ServerConfiguration>`, and restart the Jellyfin pod
-  (`kubectl -n homelab delete pod -l app=jellyfin`).
-- **Immich** needs `immich.adminApiKey` filled in from a key you generate
-  yourself after first login (Settings → API Keys), as noted above.
+**Immich** is the one remaining manual step: it needs `immich.adminApiKey`
+filled in from a key you generate yourself after first login (Settings →
+API Keys), as noted above - Immich has no equivalent unauthenticated
+first-run API to automate this the way Jellyfin's could be.
 
 After completing either step, re-run `helm upgrade` to re-trigger
 `secret-sync` (it's idempotent - re-pushing already-synced keys is
