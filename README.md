@@ -82,6 +82,14 @@ setup flow in a browser:
   `secretSync.jellyfin`. Until this is done, `JELLYFIN_API_KEY` simply
   won't appear in Homepage's secret - check `kubectl -n homelab logs
   job/secret-sync` for `[Jellyfin Key Gen Error]` if you're unsure.
+  Jellyfin 10.12+ also disabled the username/password login `secret-sync`
+  uses by default (`EnableLegacyAuthorization`, added to stop
+  [breaking Jellyseerr the same way](https://github.com/jellyfin/jellyfin/issues/15962)) -
+  if the log shows `login failed with 400 'Error processing request.'`,
+  find `system.xml` (`sudo find /srv/jellyfin -name system.xml`), set
+  `<EnableLegacyAuthorization>true</EnableLegacyAuthorization>` inside
+  `<ServerConfiguration>`, and restart the Jellyfin pod
+  (`kubectl -n homelab delete pod -l app=jellyfin`).
 - **Immich** needs `immich.adminApiKey` filled in from a key you generate
   yourself after first login (Settings → API Keys), as noted above.
 
