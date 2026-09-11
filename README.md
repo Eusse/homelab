@@ -52,8 +52,7 @@ infisicalServerBootstrapAdmin:
 immich:
   postgres:
     password: "<pick a real password>"
-  # Create this once via the Immich UI/CLI after first login (Settings > API Keys),
-  # then re-run `helm upgrade` so the sync job can mint a scoped key for Homepage.
+  # Leave blank to use secretSync.immich below for full automation instead.
   adminApiKey: ""
 
 qbittorrent:
@@ -61,35 +60,49 @@ qbittorrent:
     password: "<pick a real password>"
 
 secretSync:
-  # secret-sync creates this account itself - see the note below. Pick
-  # whatever username/password you want Jellyfin's admin to have.
+  # secret-sync creates these accounts itself - see the note below. Pick
+  # whatever username/password (or email/password) you want each admin to
+  # have.
   jellyfin:
     adminUser: "<username to create>"
+    adminPassword: "<password to set>"
+  immich:
+    adminEmail: "<email to create>"
     adminPassword: "<password to set>"
 
 pihole:
   webPassword: "<pick a real password>"
 ```
 
-**Jellyfin is fully automatic**, unlike every other app here that needs a
-first-run browser step: `secret-sync` drives Jellyfin's unauthenticated
-`/Startup/*` API directly to create the admin account (the same thing the
-setup wizard does in a browser - confirmed via Jellyfin's own source that
-those endpoints are explicitly open before the wizard completes), then
-edits `system.xml` to enable `EnableLegacyAuthorization` (Jellyfin 10.12+
-disabled username/password API login by default - the same change that
-[broke Jellyseerr's Jellyfin integration](https://github.com/jellyfin/jellyfin/issues/15962) -
-so this chart's `secret-sync` job needs it explicitly enabled to log in and
-mint an API key), restarting Jellyfin if it had to change that file. None
-of this needs you to open Jellyfin's UI at all - just set the username/
-password you want above and it creates that account for you. If it's not
-working, `kubectl -n homelab logs job/secret-sync` will show exactly which
-step failed (`[Jellyfin Setup Error]` or `[Jellyfin Key Gen Error]`).
+**Jellyfin and Immich are both fully automatic**, unlike every other app
+here that needs a first-run browser step. Both expose an unauthenticated
+"first-run" API specifically meant for driving initial setup without a
+browser (confirmed against each project's own source, not assumed):
 
-**Immich** is the one remaining manual step: it needs `immich.adminApiKey`
-filled in from a key you generate yourself after first login (Settings →
-API Keys), as noted above - Immich has no equivalent unauthenticated
-first-run API to automate this the way Jellyfin's could be.
+- **Jellyfin**: `secret-sync` calls its `/Startup/*` API to create the
+  admin account (the same thing the setup wizard does), then edits
+  `system.xml` to enable `EnableLegacyAuthorization` (Jellyfin 10.12+
+  disabled username/password API login by default - the same change that
+  [broke Jellyseerr's Jellyfin integration](https://github.com/jellyfin/jellyfin/issues/15962) -
+  so this needs to be re-enabled to log in and mint an API key), restarting
+  Jellyfin only if it had to change that file.
+- **Immich**: `secret-sync` calls `/api/auth/admin-sign-up` to create the
+  admin account, then logs in and mints an API key via `/api/api-keys`.
+  `admin-sign-up` only works once, before any admin exists - if you already
+  have one (e.g. from clicking through Immich's UI yourself), just set
+  `secretSync.immich.adminEmail`/`adminPassword` to match it and the sign-up
+  attempt is silently skipped, falling straight through to login.
+
+Neither needs you to open either app's UI at all - just fill in the
+username/password (or email/password) you want above. If either isn't
+working, `kubectl -n homelab logs job/secret-sync` will show exactly which
+step failed (`[Jellyfin Setup Error]`/`[Jellyfin Key Gen Error]` or
+`[Immich Setup]`/`[Immich Key Gen Error]`).
+
+If you'd rather not hand this chart your Immich admin credentials at all,
+set `immich.adminApiKey` instead (a key you generate by hand via Settings →
+API Keys after logging in yourself) - if it's set, it takes priority over
+`secretSync.immich` and skips the sign-up/login dance entirely.
 
 After completing either step, re-run `helm upgrade` to re-trigger
 `secret-sync` (it's idempotent - re-pushing already-synced keys is

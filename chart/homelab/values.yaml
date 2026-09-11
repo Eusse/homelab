@@ -179,8 +179,11 @@ immich:
     user: postgres
     password: immichpass
     db: immich
-  # Admin API key created manually once via the Immich UI/CLI after first
-  # login; used by secretSync to mint a scoped key for Homepage.
+  # Optional manual path: an API key you generate yourself (Settings > API
+  # Keys) after first login, used by secretSync to mint a scoped key for
+  # Homepage. Leave blank to use secretSync.immich.adminEmail/adminPassword
+  # instead for full automation (see below) - if both are set, this one
+  # wins.
   adminApiKey: ""
 
 jellyseerr:
@@ -208,4 +211,13 @@ secretSync:
   # since that's required for the password login used to mint an API key.
   jellyfin:
     adminUser: ""
+    adminPassword: ""
+  # Optional full automation for Immich, mirroring Jellyfin's: if set (and
+  # immich.adminApiKey below is left blank), secret-sync creates the admin
+  # account itself via Immich's unauthenticated first-run sign-up API - or,
+  # if an admin already exists, logs in with these same credentials. Set
+  # these to match an account you already created by hand if you're not
+  # starting fresh.
+  immich:
+    adminEmail: ""
     adminPassword: ""
