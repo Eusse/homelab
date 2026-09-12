@@ -104,6 +104,16 @@ set `immich.adminApiKey` instead (a key you generate by hand via Settings →
 API Keys after logging in yourself) - if it's set, it takes priority over
 `secretSync.immich` and skips the sign-up/login dance entirely.
 
+**Jellyseerr connects itself to Jellyfin automatically**, reusing the exact
+same `secretSync.jellyfin` credentials above - no separate values needed.
+Its `/api/v1/auth/jellyfin` endpoint is unauthenticated by design (it's how
+Jellyseerr's own login works), and when it has no media server configured
+yet, a successful call both creates Jellyseerr's admin account (linked to
+that Jellyfin login) and saves the Jellyfin connection in one step - the
+same thing its first-run setup wizard does in a browser. If Jellyseerr
+already has a media server configured (e.g. you set it up by hand already),
+this is skipped automatically rather than erroring.
+
 After completing either step, re-run `helm upgrade` to re-trigger
 `secret-sync` (it's idempotent - re-pushing already-synced keys is
 harmless).

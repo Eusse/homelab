@@ -110,10 +110,18 @@ spec:
               value: {{ .Values.jellyfin.enabled | quote }}
             - name: SYNC_IMMICH
               value: {{ .Values.immich.enabled | quote }}
+            - name: SYNC_JELLYSEERR
+              value: {{ and .Values.jellyseerr.enabled .Values.jellyfin.enabled | quote }}
             - name: JELLYFIN_URL
               value: "http://jellyfin-service.{{ .Release.Namespace }}.svc.cluster.local:8096"
+            - name: JELLYFIN_HOSTNAME
+              value: "jellyfin-service.{{ .Release.Namespace }}.svc.cluster.local"
+            - name: JELLYFIN_PORT
+              value: "8096"
             - name: IMMICH_URL
               value: "http://immich-service.{{ .Release.Namespace }}.svc.cluster.local:2283"
+            - name: JELLYSEERR_URL
+              value: "http://jellyseerr.{{ .Release.Namespace }}.svc.cluster.local:5055"
           envFrom:
             - secretRef:
                 name: secret-sync-credentials

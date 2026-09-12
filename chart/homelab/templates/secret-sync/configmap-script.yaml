@@ -280,6 +280,59 @@ data:
         except Exception as e:
             print(f"[Jellyfin Key Gen Error]: {e}")
 
+    if env_true("SYNC_JELLYSEERR"):
+        try:
+            jellyseerr_url = os.environ["JELLYSEERR_URL"]
+            jf_user = os.environ["JELLYFIN_ADMIN_USER"]
+            jf_pass = os.environ["JELLYFIN_ADMIN_PASS"]
+
+            print("Waiting for Jellyseerr to answer...")
+            public_settings = None
+            for _ in range(30):
+                try:
+                    resp = requests.get(f"{jellyseerr_url}/api/v1/settings/public", timeout=5)
+                    if resp.ok:
+                        public_settings = resp.json()
+                        break
+                except requests.RequestException:
+                    pass
+                time.sleep(2)
+            if public_settings is None:
+                raise RuntimeError("Jellyseerr never answered /api/v1/settings/public")
+
+            # MediaServerType.NOT_CONFIGURED == 4 (Plex=1, Jellyfin=2, Emby=3),
+            # confirmed in Jellyseerr's own server/constants/server.ts.
+            if not public_settings.get("initialized") or public_settings.get("mediaServerType") == 4:
+                # Confirmed in Jellyseerr's own server/routes/auth.ts: POST
+                # /auth/jellyfin has no isAuthenticated() guard (it's how
+                # login itself works), and when no media server is
+                # configured yet, a successful login here both creates
+                # Jellyseerr's admin account and saves the Jellyfin
+                # connection (including minting Jellyfin's own API key for
+                # it) in the same call - no separate "connect" step exists.
+                print("Jellyseerr has no media server configured yet - connecting it to Jellyfin...")
+                resp = requests.post(
+                    f"{jellyseerr_url}/api/v1/auth/jellyfin",
+                    json={
+                        "username": jf_user,
+                        "password": jf_pass,
+                        "hostname": os.environ["JELLYFIN_HOSTNAME"],
+                        "port": int(os.environ["JELLYFIN_PORT"]),
+                        "urlBase": "",
+                        "useSsl": False,
+                        "serverType": 2,
+                    },
+                    timeout=15,
+                )
+                if resp.ok:
+                    print("Jellyseerr connected to Jellyfin and admin account created.")
+                else:
+                    print(f"[Jellyseerr Connect Error]: {resp.status_code} {resp.text!r}")
+            else:
+                print("Jellyseerr already has a media server configured, skipping.")
+        except Exception as e:
+            print(f"[Jellyseerr Connect Error]: {e}")
+
     if env_true("SYNC_IMMICH"):
         try:
             immich_url = os.environ["IMMICH_URL"]
